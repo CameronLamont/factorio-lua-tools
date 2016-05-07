@@ -171,10 +171,13 @@ function Ingredient.from_recipe(spec)
     end
 
     if not self.item_object then
-        error(self.type .. " " .. self.name .. " doesn't exist!")
+        ---error(self.type .. " " .. self.name .. " doesn't exist!")
+        print(self.type .. " " .. self.name .. " doesn't exist!")
+    else
+        self.image = Loader.expand_path(self.item_object.icon)
     end
 
-    self.image = Loader.expand_path(self.item_object.icon)
+    
 
     return self
 end
@@ -245,9 +248,14 @@ function enumerate_recipes()
     recipes_by_result = {}
     for name, recipe in pairs(Loader.data.recipe) do
         recipe = Recipe.from_data(recipe, name)
+        print(name)
         for k, result in ipairs(recipe.results) do
+            print('>>' .. result.id)
+            print(result[2])
+            print(result[1])
             if recipes_by_result[result.id] == nil then
                 recipes_by_result[result.id] = { recipe }
+                
             else
                 recipes_by_result[result.id][#recipes_by_result[result.id] + 1] = recipe
             end
@@ -284,33 +292,37 @@ end
 
 function recipe_node(graph, recipe, closed, goal_items, item_sources, item_sinks)
     if recipe_colors[recipe.category] == nil then
-        error(recipe.category .. " is not a known recipe category (add it to recipe_colors)")
-    end
-    node = gv.node(graph, recipe.id)
-    gv.setv(node, 'shape', 'plaintext')
+        --error
+        print(recipe.category .. " is not a known recipe category (add it to recipe_colors)")
+    else
+    
+        node = gv.node(graph, recipe.id)
+        gv.setv(node, 'shape', 'plaintext')
 
-    local label = ''
-    local colspan = 0
-    label = label .. '<<TABLE bgcolor = "' .. recipe_colors[recipe.category] .. '" border="0" cellborder="1" cellspacing="0"><TR>\n'
-    for k, result in ipairs(recipe.results) do
-        label = label .. '<TD port="' .. result.id .. '"><IMG src="' .. result.image .. '" /></TD>\n'
+        local label = ''
+        local colspan = 0
+        label = label .. '<<TABLE bgcolor = "' .. recipe_colors[recipe.category] .. '" border="0" cellborder="1" cellspacing="0"><TR>\n'
+        for k, result in ipairs(recipe.results) do
+            label = label .. '<TD port="' .. result.id .. '"><IMG src="' .. result.image .. '" /></TD>\n'
+            if result.ingredients ~= nil then
+                print(#result.ingredients)
+            end
+            add_item_port(item_sources, result, {recipe.id,result.id .. ':n'})
+            colspan = colspan + 1
+        end
+        label = label .. '</TR><TR><TD colspan="' .. colspan .. '">' .. recipe:translated_name(language) .. '</TD>'
+        label = label .. '</TR></TABLE>>'
 
-        add_item_port(item_sources, result, {recipe.id,result.id .. ':n'})
-        colspan = colspan + 1
-    end
-    label = label .. '</TR><TR><TD colspan="' .. colspan .. '">' .. recipe:translated_name(language) .. '</TD>'
-    label = label .. '</TR></TABLE>>'
+        gv.setv(node, 'label', label)
 
-    gv.setv(node, 'label', label)
+        for k, ingredient in ipairs(recipe.ingredients) do
+            add_item_port(item_sinks, ingredient, {recipe.id})
 
-    for k, ingredient in ipairs(recipe.ingredients) do
-        add_item_port(item_sinks, ingredient, {recipe.id})
-
-        if not closed[ingredient.id] then
-            goal_items[#goal_items + 1] = ingredient
+            if not closed[ingredient.id] then
+                goal_items[#goal_items + 1] = ingredient
+            end
         end
     end
-
     return node
 end
 
@@ -319,7 +331,7 @@ function item_node(graph, item_id, goal)
     ingredient = Ingredient.from_recipe{type = type, name = name, amount = 1}
     node = gv.node(graph, ingredient.id)
     gv.setv(node, 'image', ingredient.image)
-    -- gv.setv(node, 'xlabel', ingredient.amount .. ' / s')
+    gv.setv(node, 'xlabel', ingredient.amount .. ' / s')
     if(goal) then
         if type == goal.type and name == goal.name then
             for attr,value in pairs(goal_attributes) do
