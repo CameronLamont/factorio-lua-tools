@@ -8,6 +8,9 @@ recipe_colors = {
     smelting = "#cc9999",
     chemistry = "#99cc99",
     ["oil-processing"] = "#999900",
+    ["crafting-with-fluid"] = "#aaaaaa",
+    ["advanced-crafting"] = "#770022",
+    ["rocket-building"] = "#443355"
 }
 goal_attributes = {
     fillcolor="#666666",
@@ -151,7 +154,9 @@ end
 function Ingredient.from_recipe(spec)
     local self = Ingredient:new()
     if spec.type == nil then
+       
         self.type = "item"
+        
         self.name = spec[1]
         self.amount = spec[2]
     else
@@ -159,21 +164,51 @@ function Ingredient.from_recipe(spec)
         self.name = spec.name
         self.amount = spec.amount
     end
+    
+     if string.find(self.name,"science") then
+            --print("***this is a science pack " .. spec[1] .. " converting to item")
+            -- for some reason science packs are 'tools' in the item.lua spec
+            self.type = "tool"
+        
+        end
+    
     self:_make_id()
 
+    
+    -- if string.find(self.name,"science") then
+    --     print("***this is a science pack " .. self.type .. " " .. self.name)
+    -- end
     if self.type == "item" then
+        
         for k, type in ipairs(Loader.item_types) do
+            --print("Trying to load " .. type .. self.name)
+            
+            
+            --print(k .." ".. type .. " " .. self.name)
             self.item_object = Loader.data[type][self.name]
             if self.item_object ~= nil then break end
         end
     else
+        -- if string.find(self.name,"science") then
+        --     print(self.type .. " " .. self.name)
+        -- end
         self.item_object = Loader.data[self.type][self.name]
+        -- if self.item_object then
+        --     print("found")
+        --     print(self.item_object.icon)
+        -- else
+        --     print("not found")
+        -- end
     end
 
     if not self.item_object then
+        --print("Creating " ..  self.name)
         ---error(self.type .. " " .. self.name .. " doesn't exist!")
         print(self.type .. " " .. self.name .. " doesn't exist!")
     else
+        -- if string.find(self.name,"science") then
+        --     print(self.type .. " " .. self.name .. " " .. self.item_object.icon)
+        -- end
         self.image = Loader.expand_path(self.item_object.icon)
     end
 
@@ -183,10 +218,17 @@ function Ingredient.from_recipe(spec)
 end
 
 function Ingredient:_make_id()
+    if string.find(self.name,"science") then
+        print("Making name for " .. self.type .. " " .. self.name)
+    end
     self.id = self.type .. "-" .. self.name
 end
 
 function Ingredient:translated_name(language)
+    if string.find(self.name,"science") then
+        print("Trnslated name for " .. self.type .. " " .. self.name)
+    end
+   
     local item_name = Loader.translate(self.type .. "-name." .. self.name, language)
     if item_name then
         return item_name
@@ -194,8 +236,11 @@ function Ingredient:translated_name(language)
 
     if self.item_object.place_result then
         return Loader.translate("entity-name." .. self.item_object.place_result, language)
-    else
+    
+    elseif self.item_object.placed_as_equipment_result then
         return Loader.translate("equipment-name." .. self.item_object.placed_as_equipment_result, language)
+    else
+        return self.name
     end
 end
 
@@ -213,7 +258,19 @@ function Recipe.from_data(spec, name)
     self.id = 'recipe-' .. name
     self.category = spec.category or "crafting"
     self.ingredients = {}
+    self.type = spec.type
+    
+    
+    -- if string.find(self.name,"science") then
+    --     print("***this is a science pack " .. " " .. self.name .. " " .. self.type)
+    
+    --     -- for k,v in pairs(spec) do
+    --     --     print(k .. ' ' .. v)
+    --     -- end
+    -- end
+    
     for k, v in ipairs(spec.ingredients) do
+        
         self.ingredients[#self.ingredients + 1] = Ingredient.from_recipe(v)
     end
     if spec.results ~= nil then
@@ -232,6 +289,8 @@ function Recipe:translated_name(language)
 end
 
 function enumerate_resource_items()
+    -- populate complete list of resource items
+
     resource_items = {}
     for name, resource in pairs(Loader.data.resource) do
         if resource.minable.results ~= nil then
@@ -245,14 +304,19 @@ function enumerate_resource_items()
 end
 
 function enumerate_recipes()
+    -- populate complete list of recipes and their ingredients
+
     recipes_by_result = {}
     for name, recipe in pairs(Loader.data.recipe) do
+        -- if string.find(name,"science") then
+        --     print("***this is a science pack " .. name)
+        -- end
         recipe = Recipe.from_data(recipe, name)
-        print(name)
+        --print(name)
         for k, result in ipairs(recipe.results) do
-            print('>>' .. result.id)
-            print(result[2])
-            print(result[1])
+            --print('>>' .. result.id)
+            --print(result[2])
+            --print(result[1])
             if recipes_by_result[result.id] == nil then
                 recipes_by_result[result.id] = { recipe }
                 
@@ -271,7 +335,8 @@ function find_recipe(result)
         for k, v in ipairs(recipe.results) do
             if v.type == result.type and v.name == result.name then
                 if ret ~= nil then
-                    --error("multiple recipes with the same result (" .. ret_recipe.name .. " and " .. recipe.name .. ")")
+                    --error
+                    print("multiple recipes with the same result (" .. ret_recipe.name .. " and " .. recipe.name .. ")")
                 end
                 ret = recipe
                 ret.amount = result.amount / v.amount
@@ -304,11 +369,15 @@ function recipe_node(graph, recipe, closed, goal_items, item_sources, item_sinks
         label = label .. '<<TABLE bgcolor = "' .. recipe_colors[recipe.category] .. '" border="0" cellborder="1" cellspacing="0"><TR>\n'
         for k, result in ipairs(recipe.results) do
             label = label .. '<TD port="' .. result.id .. '"><IMG src="' .. result.image .. '" /></TD>\n'
-            if result.ingredients ~= nil then
-                print(#result.ingredients)
-            end
+            --if result.ingredients ~= nil then
+            --    print(#result.ingredients)
+            --end
             add_item_port(item_sources, result, {recipe.id,result.id .. ':n'})
             colspan = colspan + 1
+            -- if colspan > 1 then
+            --     print("colspan=" .. colspan .. " " .. recipe.id .. " " .. recipe.category .. " x" .. result.amount)
+                
+            -- end
         end
         label = label .. '</TR><TR><TD colspan="' .. colspan .. '">' .. recipe:translated_name(language) .. '</TD>'
         label = label .. '</TR></TABLE>>'
@@ -327,11 +396,14 @@ function recipe_node(graph, recipe, closed, goal_items, item_sources, item_sinks
 end
 
 function item_node(graph, item_id, goal)
+    --print('**item_node ' .. item_id)
     local type, name = item_id:match('^(%a+)-(.*)$')
     ingredient = Ingredient.from_recipe{type = type, name = name, amount = 1}
     node = gv.node(graph, ingredient.id)
     gv.setv(node, 'image', ingredient.image)
     gv.setv(node, 'xlabel', ingredient.amount .. ' / s')
+   
+    -- if the item is a goal item then apply the goal attributes to the node
     if(goal) then
         if type == goal.type and name == goal.name then
             for attr,value in pairs(goal_attributes) do
@@ -343,40 +415,62 @@ function item_node(graph, item_id, goal)
 end
 
 function output_graph(goal_items)
+    -- use 'factorio' as the output file name if monolithic_graph else the goal_item id
     local graphname = (monolithic_graph) and 'factorio' or (goal_items[1].id)
     local graph = gv.digraph(graphname)
 
+    
     if(monolithic_graph) then
+        -- set row height in graph
         gv.setv(graph, 'ranksep', monolithic_ranksep)
     else
+        -- make the first goal item the root node ??
         gv.setv(graph, 'root', goal_items[1].id)
     end
     
+    
+    
+    -- apply default graph attributes to new graph
     for attr,value in pairs(graph_attributes) do
         gv.setv(graph, attr, value);
     end
-    if(output_format=='jpg' and graph_attributes.bgcolor=='transparent') then
-        gv.setv(graph, 'bgcolor', 'white')
-    end
+    
+    -- apply default node attributes to each proto node of the graph ?
     for attr,value in pairs(node_attributes) do
         gv.setv(gv.protonode(graph), attr, value);
     end
+    -- apply default edge attributes to each proto edge of the graph ?
     for attr,value in pairs(edge_attributes) do
         gv.setv(gv.protoedge(graph), attr, value);
     end
+
+    -- convert transparent to white for jpg output
+    if(output_format=='jpg' and graph_attributes.bgcolor=='transparent') then
+        gv.setv(graph, 'bgcolor', 'white')
+    end
+    
+
 
     local closed = {}
     local item_sources = {}
     local item_sinks = {}
 
     local i=0
+    -- loop through goal items
     while i<#goal_items do
         i=i+1
         local current = goal_items[i]
+        -- print("current = " .. current.id)
         if closed[current.id] == nil then
             closed[current.id] = current
         end
 
+        if(string.find(current.id,"science"))then
+            print("Checking sources and recipe lists for " .. current.id)
+            print(resource_items[current.id])
+            print((recipes_by_result[current.id] ~= nil and #recipes_by_result[current.id] or 0) .. " recipes")
+        end
+        -- if current is a resource and used in at least one recipe
         if not resource_items[current.id] and recipes_by_result[current.id] ~= nil then
             for k, recipe in pairs(recipes_by_result[current.id]) do
                 if not closed[recipe.id] then
@@ -408,6 +502,7 @@ function output_graph(goal_items)
                     end
                 end
             else
+                -- skip_output_items will skip over items not used in any recipes
                 if(not skip_output_items) then
                     item_node(graph, id, (not monolithic_graph) and goal_items[1] or nil)
                     local edge = gv.edge(graph, source_port[1], id)
@@ -423,6 +518,7 @@ function output_graph(goal_items)
         end
     end
 
+    -- create edges between id and sink port???
     for id, sink_ports in pairs(item_sinks) do
         for k, sink_port in pairs(sink_ports) do
             if item_sources[id] == nil then
@@ -436,7 +532,9 @@ function output_graph(goal_items)
         end
     end
 
+    -- write output file
     if(output_format=='png' or output_format=='jpg') then
+        -- if not writing a monolithic_graph output the name of the goal item only
         if(not monolithic_graph) then
             print(goal_items[1].id)
         end
@@ -459,14 +557,15 @@ graphs_generated = 0
 item_list = {}
 
 table.insert(Loader.item_types,"fluid")
+table.insert(Loader.item_types,"tool")
 for k, item_type in ipairs(Loader.item_types) do
     for name, item in pairs(Loader.data[item_type]) do
         if(specific_item == nil or specific_item == name) then
             if(monolithic_graph) then
-                table.insert(item_list,Ingredient.from_recipe{name = name, type=(item_type=="fluid") and "fluid" or "item", amount=1})
+                table.insert(item_list,Ingredient.from_recipe{name = name, type=(item_type=="fluid") and "fluid" or (item_type=="tool") and "tool" or "item" , amount=1})
             else
                 graphs_generated = graphs_generated + 1
-                output_graph({Ingredient.from_recipe{name = name, type=(item_type=="fluid") and "fluid" or "item", amount=1}})
+                output_graph({Ingredient.from_recipe{name = name, type=(item_type=="fluid") and "fluid" or (item_type=="tool") and "tool" or "item" , amount=1}})
             end
         end
     end
