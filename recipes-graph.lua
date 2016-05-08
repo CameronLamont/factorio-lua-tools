@@ -234,13 +234,20 @@ function Ingredient:translated_name(language)
         return item_name
     end
 
+
+
     if self.item_object.place_result then
         return Loader.translate("entity-name." .. self.item_object.place_result, language)
     
     elseif self.item_object.placed_as_equipment_result then
         return Loader.translate("equipment-name." .. self.item_object.placed_as_equipment_result, language)
     else
-        return self.name
+        item_name = Loader.translate("item" .. "-name." .. self.name, language)
+        if item_name then
+            return item_name
+        else
+            return self.name
+        end
     end
 end
 
@@ -363,7 +370,8 @@ function recipe_node(graph, recipe, closed, goal_items, item_sources, item_sinks
     
         node = gv.node(graph, recipe.id)
         gv.setv(node, 'shape', 'plaintext')
-
+        gv.setv(node, 'xlabel', 'xxxx' .. ' / s')
+   
         local label = ''
         local colspan = 0
         label = label .. '<<TABLE bgcolor = "' .. recipe_colors[recipe.category] .. '" border="0" cellborder="1" cellspacing="0"><TR>\n'
@@ -374,10 +382,9 @@ function recipe_node(graph, recipe, closed, goal_items, item_sources, item_sinks
             --end
             add_item_port(item_sources, result, {recipe.id,result.id .. ':n'})
             colspan = colspan + 1
-            -- if colspan > 1 then
-            --     print("colspan=" .. colspan .. " " .. recipe.id .. " " .. recipe.category .. " x" .. result.amount)
-                
-            -- end
+            
+            print("colspan=" .. colspan .. " " .. recipe.id .. " " .. recipe.category .. " x" .. result.amount)
+            
         end
         label = label .. '</TR><TR><TD colspan="' .. colspan .. '">' .. recipe:translated_name(language) .. '</TD>'
         label = label .. '</TR></TABLE>>'
@@ -390,6 +397,8 @@ function recipe_node(graph, recipe, closed, goal_items, item_sources, item_sinks
             if not closed[ingredient.id] then
                 goal_items[#goal_items + 1] = ingredient
             end
+            
+            print(ingredient.id .. ' x' .. ingredient.amount)
         end
     end
     return node
@@ -489,6 +498,7 @@ function output_graph(goal_items)
         for k, source_port in pairs(source_ports) do
             sink_ports = item_sinks[id]
             if sink_ports then
+                -- if item has at least one sink port
                 for k, sink_port in ipairs(sink_ports) do
                     local edge = gv.edge(graph, source_port[1], sink_port[1])
                     if(edge_color) then
@@ -500,8 +510,12 @@ function output_graph(goal_items)
                     if (sink_port[2]) then
                         gv.setv(edge,'headport',sink_port[2])
                     end
+                    gv.setv(edge, 'xlabel', 'yyyy' .. ' / s')
+   
                 end
             else
+                --final output items
+                
                 -- skip_output_items will skip over items not used in any recipes
                 if(not skip_output_items) then
                     item_node(graph, id, (not monolithic_graph) and goal_items[1] or nil)
@@ -513,6 +527,9 @@ function output_graph(goal_items)
                     if (source_port[2]) then
                         gv.setv(edge,'tailport',source_port[2])
                     end
+                    
+                    gv.setv(node, 'xlabel', 'zzzz' .. ' / s')
+   
                 end
             end
         end
@@ -528,6 +545,9 @@ function output_graph(goal_items)
                 if (sink_port[2]) then
                     gv.setv(edge,'headport',sink_port[2])
                 end
+                
+                gv.setv(node, 'xlabel', 'jjjjj' .. ' / s')
+   
             end
         end
     end
